@@ -160,9 +160,15 @@ static char* hostif_vlan_tag[] = {
  *    default VLAN and all ports removed from .1Q bridge.
  */
 PortsOrch::PortsOrch(DBConnector *db, vector<table_name_with_pri_t> &tableNames) :
-        Orch(db, tableNames)
+        Orch(db, tableNames),
+        m_boot_timer(new SelectableTimer(timespec { .tv_sec = 0, .tv_nsec = 0 })),
+        m_boot_timeout_reached(false)
 {
     SWSS_LOG_ENTER();
+
+    /* Initialize timer for flex counters */
+    auto executor = new ExecutableTimer(m_boot_timer, this, "Flex Counters Timer");
+    Orch::addExecutor(executor);
 
     /* Initialize counter table */
     m_counter_db = shared_ptr<DBConnector>(new DBConnector("COUNTERS_DB", 0));
@@ -1574,6 +1580,17 @@ bool PortsOrch::initPort(const string &alias, const set<int> &lane_set)
                 {
                     port_buffer_drop_stream << delimiter << sai_serialize_port_stat(it);
                     delimiter = comma;
+                }
+
+                if (m_boot_timeout_reached)
+                {
+                    port_stat_manager.setCounterIdList(p.m_port_id, CounterType::PORT, counter_stats);
+                    port_buffer_drop_stat_manager.setCounterIdList(p.m_port_id, CounterType::PORT, port_buffer_drop_stats);
+                }
+                else
+                {
+                    m_port_stat_list.push_back( tuple<sai_object_id_t, CounterType::PORT, std::unordered_set<std::string>>(p.m_port_id, CounterType::PORT, counter_stats));
+                    m_port_buffer_drop_stat_list.push_back( tuple<sai_object_id_t, CounterType::PORT, std::unordered_set<std::string>>(p.m_port_id, CounterType::PORT, port_buffer_drop_stats));
                 }
 
                 fields.clear();
@@ -3876,5 +3893,19 @@ void PortsOrch::getPortSerdesVal(const std::string& val_str,
     {
         lane_val = (uint32_t)std::stoul(lane_str, NULL, 16);
         lane_values.push_back(lane_val);
+    }
+}
+
+void PortsOrch::doTask(SelectableTimer &timer)
+{
+    SWSS_LOG_ENTER();
+    m_boot_timeout_reached = true;
+    for (auto port_stat : m_port_stat_list)
+    {
+        port_stat_manager.setCounterIdList(std::get<0>(port_stat), std::get<1>(port_stat), std::get<2>(port_stat));
+    }
+    for (auto port_buffer_drop_stat : m_port_buffer_drop_stat_list)
+    {
+        port_buffer_drop_stat_manager.setCounterIdList(std::get<0>(port_buffer_drop_stat), std::get<1>(port_buffer_drop_stat), std::get<2>(port_buffer_drop_stat));
     }
 }

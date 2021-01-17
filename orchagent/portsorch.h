@@ -9,6 +9,8 @@
 #include "observer.h"
 #include "macaddress.h"
 #include "producertable.h"
+#include "select.h"
+#include "timer.h"
 
 #define FCS_LEN 4
 #define VLAN_TAG_LEN 4
@@ -17,6 +19,7 @@
 #define QUEUE_STAT_COUNTER_FLEX_COUNTER_GROUP "QUEUE_STAT_COUNTER"
 #define QUEUE_WATERMARK_STAT_COUNTER_FLEX_COUNTER_GROUP "QUEUE_WATERMARK_STAT_COUNTER"
 #define PG_WATERMARK_STAT_COUNTER_FLEX_COUNTER_GROUP "PG_WATERMARK_STAT_COUNTER"
+#define BOOT_TIMEOUT 120
 
 
 typedef std::vector<sai_uint32_t> PortSupportedSpeeds;
@@ -139,6 +142,12 @@ private:
     unordered_set<string> m_pendingPortSet;
 
     NotificationConsumer* m_portStatusNotificationConsumer;
+
+    // Data structure to keep all flex counters information to handle after boot has finished.
+    bool m_boot_timeout_reached;
+    SelectableTimer* m_boot_timer = nullptr;
+    typedef std::vector< tuple<sai_object_id_t, CounterType::PORT, std::unordered_set<std::string>> > m_port_stat_list;
+    typedef std::vector< tuple<sai_object_id_t, CounterType::PORT, std::unordered_set<std::string>> > m_port_buffer_drop_stat_list;
 
     void doTask() override;
     void doTask(Consumer &consumer);
