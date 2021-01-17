@@ -22,6 +22,7 @@
 #define QUEUE_STAT_COUNTER_FLEX_COUNTER_GROUP "QUEUE_STAT_COUNTER"
 #define QUEUE_WATERMARK_STAT_COUNTER_FLEX_COUNTER_GROUP "QUEUE_WATERMARK_STAT_COUNTER"
 #define PG_WATERMARK_STAT_COUNTER_FLEX_COUNTER_GROUP "PG_WATERMARK_STAT_COUNTER"
+#define BOOT_TIMEOUT 30
 
 
 typedef std::vector<sai_uint32_t> PortSupportedSpeeds;
@@ -209,6 +210,11 @@ private:
 
     NotificationConsumer* m_portStatusNotificationConsumer;
 
+    // Data structure to keep all flex counters information to handle after boot has finished.
+    bool m_boot_timeout_reached;
+    SelectableTimer* m_boot_timer = nullptr;
+    vector<tuple<sai_object_id_t, enum CounterType, unordered_set<string>>> m_port_stat_list;
+
     void doTask() override;
     void doTask(Consumer &consumer);
     void doPortTask(Consumer &consumer);
@@ -218,6 +224,8 @@ private:
     void doLagMemberTask(Consumer &consumer);
 
     void doTask(NotificationConsumer &consumer);
+
+    void doTask(SelectableTimer &timer);
 
     void removePortFromLanesMap(string alias);
     void removePortFromPortListMap(sai_object_id_t port_id);

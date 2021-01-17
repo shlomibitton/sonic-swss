@@ -223,9 +223,16 @@ PortsOrch::PortsOrch(DBConnector *db, vector<table_name_with_pri_t> &tableNames)
         Orch(db, tableNames),
         port_stat_manager(PORT_STAT_COUNTER_FLEX_COUNTER_GROUP, StatsMode::READ, PORT_STAT_FLEX_COUNTER_POLLING_INTERVAL_MS, true),
         port_buffer_drop_stat_manager(PORT_BUFFER_DROP_STAT_FLEX_COUNTER_GROUP, StatsMode::READ, PORT_BUFFER_DROP_STAT_POLLING_INTERVAL_MS, true),
-        queue_stat_manager(QUEUE_STAT_COUNTER_FLEX_COUNTER_GROUP, StatsMode::READ, QUEUE_STAT_FLEX_COUNTER_POLLING_INTERVAL_MS, true)
+        queue_stat_manager(QUEUE_STAT_COUNTER_FLEX_COUNTER_GROUP, StatsMode::READ, QUEUE_STAT_FLEX_COUNTER_POLLING_INTERVAL_MS, true),
+        m_boot_timer(new SelectableTimer(timespec { .tv_sec = BOOT_TIMEOUT, .tv_nsec = 0 })),
+        m_boot_timeout_reached(false)
 {
     SWSS_LOG_ENTER();
+
+    /* Initialize timer for flex counters */
+    auto executor = new ExecutableTimer(m_boot_timer, this, "Flex Counters Timer");
+    Orch::addExecutor(executor);
+    m_boot_timer->reset();
 
     /* Initialize counter table */
     m_counter_db = shared_ptr<DBConnector>(new DBConnector("COUNTERS_DB", 0));
@@ -1900,7 +1907,15 @@ bool PortsOrch::initPort(const string &alias, const int index, const set<int> &l
                 {
                     counter_stats.emplace(sai_serialize_port_stat(it));
                 }
-                port_stat_manager.setCounterIdList(p.m_port_id, CounterType::PORT, counter_stats);
+                if (m_boot_timeout_reached)
+                {
+                    port_stat_manager.setCounterIdList(p.m_port_id, CounterType::PORT, counter_stats);
+                }
+                else
+                {
+                    m_port_stat_list.push_back(make_tuple(p.m_port_id, CounterType::PORT, counter_stats));
+                }
+
                 std::unordered_set<std::string> port_buffer_drop_stats;
                 for (const auto& it: port_buffer_drop_stat_ids)
                 {
@@ -4946,4 +4961,22 @@ bool PortsOrch::setVoqInbandIntf(string &alias, string &type)
     return true;
 }
 
-
+// Check if all ports are ready.
+// if yes install all flex counters to DB. */
+void PortsOrch::doTask(SelectableTimer &timer)
+{
+    SWSS_LOG_NOTICE("SHLOMI timer reached");
+    if (allPortsReady())
+    {
+        m_boot_timer->stop();
+        m_boot_timeout_reached = true;
+        for (auto port_stat : m_port_stat_list)
+        {
+            port_stat_manager.setCounterIdList(std::get<0>(port_stat), std::get<1>(port_stat), std::get<2>(port_stat));
+        }
+    }
+    else
+    {
+        m_boot_timer->reset();
+    }
+}
