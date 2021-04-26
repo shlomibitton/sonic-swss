@@ -8,6 +8,7 @@
 #include "exec.h"
 #include "shellcmd.h"
 #include "warm_restart.h"
+#include <ttime.h>
 
 using namespace std;
 using namespace swss;
@@ -58,7 +59,13 @@ void IntfMgr::setIntfIp(const string &alias, const string &opCmd,
         (cmd << IP_CMD << " -6 address " << shellquote(opCmd) << " " << shellquote(ipPrefixStr) << " dev " << shellquote(alias));
     }
 
+    lt_time_us current1, current2;
+    current1 = lt_curr_time_us();
     int ret = swss::exec(cmd.str(), res);
+    current2 = lt_curr_time_us();
+    SWSS_LOG_NOTICE("Command %s was runnig for [%lu] us", cmd.str().c_str(), current2 - current1);
+
+    
     if (ret)
     {
         SWSS_LOG_ERROR("Command '%s' failed with rc %d", cmd.str().c_str(), ret);
@@ -476,13 +483,13 @@ bool IntfMgr::doIntfGeneralTask(const vector<string>& keys,
     {
         if (!isIntfStateOk(alias))
         {
-            SWSS_LOG_DEBUG("Interface is not ready, skipping %s", alias.c_str());
+            SWSS_LOG_NOTICE("Interface is not ready, skipping %s", alias.c_str());
             return false;
         }
 
         if (!vrf_name.empty() && !isIntfStateOk(vrf_name))
         {
-            SWSS_LOG_DEBUG("VRF is not ready, skipping %s", vrf_name.c_str());
+            SWSS_LOG_NOTICE("VRF is not ready, skipping %s", vrf_name.c_str());
             return false;
         }
 
@@ -595,6 +602,7 @@ bool IntfMgr::doIntfGeneralTask(const vector<string>& keys,
            be set with global vrf and it may cause ip address confliction. */
         if (getIntfIpCount(alias))
         {
+            SWSS_LOG_NOTICE("Skip delete attribute for interface %s because ip count is: %d", alias, getIntfIpCount(alias));
             return false;
         }
 
@@ -643,7 +651,7 @@ bool IntfMgr::doIntfAddrTask(const vector<string>& keys,
          */
         if (!isIntfStateOk(alias) || !isIntfCreated(alias))
         {
-            SWSS_LOG_DEBUG("Interface is not ready, skipping %s", alias.c_str());
+            SWSS_LOG_NOTICE("Interface is not ready, skipping %s", alias.c_str());
             return false;
         }
 
@@ -688,7 +696,13 @@ void IntfMgr::doTask(Consumer &consumer)
 
         if (keys.size() == 1)
         {
-            if (!doIntfGeneralTask(keys, data, op))
+            lt_time_us current1, current2;
+            current1 = lt_curr_time_us();
+            bool res = doIntfGeneralTask(keys, data, op);
+            current2 = lt_curr_time_us();
+            SWSS_LOG_NOTICE("doIntfGeneralTask was runnig for [%lu] us", current2 - current1);
+
+            if (!res)
             {
                 it++;
                 continue;
