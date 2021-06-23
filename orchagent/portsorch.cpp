@@ -5087,7 +5087,7 @@ void PortsOrch::generatePortCounterMap()
     auto port_counter_stats = generateCounterStats(PORT_STAT_COUNTER_FLEX_COUNTER_GROUP);
     for (const auto& it: m_portList)
     {
-        if (it.first.find("Ethernet") == string::npos)
+        if (it.second.m_type != Port::Type::PHY)
         {
             continue;
         }
@@ -5107,7 +5107,7 @@ void PortsOrch::generatePortBufferDropCounterMap()
     auto port_buffer_drop_stats = generateCounterStats(PORT_BUFFER_DROP_STAT_FLEX_COUNTER_GROUP);
     for (const auto& it: m_portList)
     {
-        if (it.first.find("Ethernet") == string::npos)
+        if (it.second.m_type != Port::Type::PHY)
         {
             continue;
         }
