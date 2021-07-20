@@ -121,6 +121,7 @@ void NeighSync::onMsg(int nlmsg_type, struct nl_object *obj)
             m_neighTable.del(key);
             return;
         }
+        // SWSS_LOG_NOTICE("SHLOMI neighsync creating new neighbor: %s", key.c_str());
         m_neighTable.set(key, fvVector);
     }
 }

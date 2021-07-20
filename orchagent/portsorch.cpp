@@ -1805,6 +1805,7 @@ bool PortsOrch::setHostIntfsOperStatus(const Port& port, bool isUp) const
     attr.value.booldata = isUp;
 
     sai_status_t status = sai_hostif_api->set_hostif_attribute(port.m_hif_id, &attr);
+    // sai_status_t status = SAI_STATUS_SUCCESS;
     if (status != SAI_STATUS_SUCCESS)
     {
         SWSS_LOG_WARN("Failed to set operation status %s to host interface %s",
@@ -4401,6 +4402,27 @@ void PortsOrch::generatePortCounterMap()
     m_isPortCounterMapGenerated = true;
 }
 
+void PortsOrch::processNotifications(std::string orch)
+{
+    SWSS_LOG_ENTER();
+
+    if (!allPortsReady())
+    {
+        return;
+    }
+
+    if (m_portStatusNotificationConsumer->hasData() == false)
+    {
+        return;
+    }
+
+    while (m_portStatusNotificationConsumer->peek())
+    {
+        SWSS_LOG_NOTICE("processNotifications success from: %s", orch.c_str());
+        doTask(*m_portStatusNotificationConsumer);
+    }
+}
+
 void PortsOrch::generatePortBufferDropCounterMap()
 {
     if (m_isPortBufferDropCounterMapGenerated)
@@ -4435,6 +4457,11 @@ void PortsOrch::doTask(NotificationConsumer &consumer)
     std::string op;
     std::string data;
     std::vector<swss::FieldValueTuple> values;
+
+    if (consumer.hasData() == false)
+    {
+        return;
+    }
 
     consumer.pop(op, data, values);
 

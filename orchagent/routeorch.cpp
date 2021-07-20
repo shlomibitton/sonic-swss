@@ -136,6 +136,30 @@ RouteOrch::RouteOrch(DBConnector *db, string tableName, SwitchOrch *switchOrch, 
 
     /* TODO: Add the link-local fe80::/10 route to cpu in every VRF created from
      * vrforch::addOperation. */
+
+    // Init timer
+    auto interv = timespec { .tv_sec = 60, .tv_nsec = 0 };
+    m_ready_for_routes_timer = new SelectableTimer(interv);
+    auto executor = new ExecutableTimer(m_ready_for_routes_timer, this, "ROUTES_CREATION_TIMER");
+    Orch::addExecutor(executor);
+    m_ready_for_routes_timer->start();
+}
+
+void RouteOrch::doTask(SelectableTimer &timer)
+{
+    SWSS_LOG_NOTICE("RouteOrch Timer reached");
+    // if (this->counter == 0)
+    // {
+    ready_for_routes = true;
+    SWSS_LOG_NOTICE("RouteOrch Timer ready_for_routes changed to true");
+    // }
+    // if (this->counter == 3)
+    // {
+    //     ready_for_routes = true;
+    //     SWSS_LOG_NOTICE("RouteOrch Timer ready_for_routes changed to true");
+    //     m_ready_for_routes_timer->stop();
+    // }
+    // this->counter++;
 }
 
 std::string RouteOrch::getLinkLocalEui64Addr(void)
@@ -313,6 +337,8 @@ bool RouteOrch::validnexthopinNextHopGroup(const NextHopKey &nexthop, uint32_t& 
         {
             continue;
         }
+
+        // SWSS_LOG_ERROR("DEBUG: %s", nexthop.ip_address.to_string().c_str());
 
         vector<sai_attribute_t> nhgm_attrs;
         sai_attribute_t nhgm_attr;
@@ -659,8 +685,15 @@ void RouteOrch::doTask(Consumer& consumer)
                     /* subnet route, vrf leaked route, etc */
                     else
                     {
-                        if (addRoute(ctx, nhg))
+                        if (ready_for_routes && addRoute(ctx, nhg))
+                        {
                             it = consumer.m_toSync.erase(it);
+                            // this->counter++;
+                            // if (this->counter == 2)
+                            // {
+                            //     ready_for_routes = false;
+                            // }
+                        }
                         else
                             it++;
                     }
@@ -669,8 +702,15 @@ void RouteOrch::doTask(Consumer& consumer)
                     m_syncdRoutes.at(vrf_id).find(ip_prefix) == m_syncdRoutes.at(vrf_id).end() ||
                     m_syncdRoutes.at(vrf_id).at(ip_prefix) != nhg)
                 {
-                    if (addRoute(ctx, nhg))
+                    if (ready_for_routes && addRoute(ctx, nhg))
+                    {
                         it = consumer.m_toSync.erase(it);
+                        // this->counter++;
+                        // if (this->counter == 2)
+                        // {
+                        //     ready_for_routes = false;
+                        // }
+                    }
                     else
                         it++;
                 }
@@ -1010,6 +1050,8 @@ bool RouteOrch::addNextHopGroup(const NextHopGroupKey &nexthops)
                         Reaching maximum number of next hop groups.");
         return false;
     }
+
+    // gPortsOrch->processNotifications("RouteOrch::addNextHopGroup");
 
     vector<sai_object_id_t> next_hop_ids;
     set<NextHopKey> next_hop_set = nexthops.getNextHops();
