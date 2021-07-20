@@ -131,6 +131,11 @@ private:
     int m_nextHopGroupCount;
     int m_maxNextHopGroupCount;
     bool m_resync;
+    bool ready_for_routes = false;
+    // int counter = 0;
+    SelectableTimer *m_ready_for_routes_timer = nullptr;
+
+    void doTask(SelectableTimer &timer);
 
     RouteTables m_syncdRoutes;
     NextHopGroupTable m_syncdNextHopGroups;

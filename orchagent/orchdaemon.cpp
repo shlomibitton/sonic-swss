@@ -166,19 +166,19 @@ bool OrchDaemon::init()
     gDirectory.set(evpn_nvo_orch);
 
 
-    vector<string> qos_tables = {
-        CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
-        CFG_SCHEDULER_TABLE_NAME,
-        CFG_DSCP_TO_TC_MAP_TABLE_NAME,
-        CFG_DOT1P_TO_TC_MAP_TABLE_NAME,
-        CFG_QUEUE_TABLE_NAME,
-        CFG_PORT_QOS_MAP_TABLE_NAME,
-        CFG_WRED_PROFILE_TABLE_NAME,
-        CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-        CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
-        CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
-    };
-    QosOrch *qos_orch = new QosOrch(m_configDb, qos_tables);
+    // vector<string> qos_tables = {
+    //     CFG_TC_TO_QUEUE_MAP_TABLE_NAME,
+    //     CFG_SCHEDULER_TABLE_NAME,
+    //     CFG_DSCP_TO_TC_MAP_TABLE_NAME,
+    //     CFG_DOT1P_TO_TC_MAP_TABLE_NAME,
+    //     CFG_QUEUE_TABLE_NAME,
+    //     CFG_PORT_QOS_MAP_TABLE_NAME,
+    //     CFG_WRED_PROFILE_TABLE_NAME,
+    //     CFG_TC_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+    //     CFG_PFC_PRIORITY_TO_PRIORITY_GROUP_MAP_TABLE_NAME,
+    //     CFG_PFC_PRIORITY_TO_QUEUE_MAP_TABLE_NAME
+    // };
+    // QosOrch *qos_orch = new QosOrch(m_configDb, qos_tables);
 
     vector<string> buffer_tables = {
         APP_BUFFER_POOL_TABLE_NAME,
@@ -271,7 +271,7 @@ bool OrchDaemon::init()
      * when iterating ConsumerMap. This is ensured implicitly by the order of keys in ordered map.
      * For cases when Orch has to process tables in specific order, like PortsOrch during warm start, it has to override Orch::doTask()
      */
-    m_orchList = { gSwitchOrch, gCrmOrch, gPortsOrch, gBufferOrch, gIntfsOrch, gNeighOrch, gRouteOrch, copp_orch, tunnel_decap_orch, qos_orch, wm_orch, policer_orch, sflow_orch, debug_counter_orch};
+    m_orchList = { gSwitchOrch, gCrmOrch, gPortsOrch, gBufferOrch, gIntfsOrch, gNeighOrch, gRouteOrch, copp_orch, tunnel_decap_orch, wm_orch, policer_orch, sflow_orch, debug_counter_orch};
 
     bool initialize_dtel = false;
     if (platform == BFN_PLATFORM_SUBSTRING || platform == VS_PLATFORM_SUBSTRING)
@@ -550,15 +550,24 @@ void OrchDaemon::start()
             continue;
         }
 
+        // gPortsOrch->processNotifications();
+
         auto *c = (Executor *)s;
+        // SWSS_LOG_NOTICE("Executor before");
         c->execute();
+        // SWSS_LOG_NOTICE("Executor after, name: %s", typeid(*c).name());
 
         /* After each iteration, periodically check all m_toSync map to
          * execute all the remaining tasks that need to be retried. */
 
         /* TODO: Abstract Orch class to have a specific todo list */
         for (Orch *o : m_orchList)
+        {
+            // gPortsOrch->processNotifications();
+            // SWSS_LOG_NOTICE("Orch before, name: %s", typeid(*o).name());
             o->doTask();
+            // SWSS_LOG_NOTICE("Orch after, name: %s", typeid(*o).name());
+        }
 
         /*
          * Asked to check warm restart readiness.

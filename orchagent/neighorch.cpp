@@ -157,6 +157,8 @@ bool NeighOrch::addNextHop(const IpAddress &ipAddress, const string &alias)
 {
     SWSS_LOG_ENTER();
 
+    gPortsOrch->processNotifications("NeighOrch::addNextHop");
+
     Port p;
     if (!gPortsOrch->getPort(alias, p))
     {
@@ -599,6 +601,8 @@ bool NeighOrch::addNeighbor(const NeighborEntry &neighborEntry, const MacAddress
 {
     SWSS_LOG_ENTER();
 
+    gPortsOrch->processNotifications("NeighOrch::addNeighbor");
+
     sai_status_t status;
     IpAddress ip_address = neighborEntry.ip_address;
     string alias = neighborEntry.alias;
@@ -627,6 +631,7 @@ bool NeighOrch::addNeighbor(const NeighborEntry &neighborEntry, const MacAddress
 
     if (!hw_config && mux_orch->isNeighborActive(ip_address, macAddress, alias))
     {
+        // SWSS_LOG_NOTICE("SHLOMI adding neighbor: %s", inet_ntoa(*((struct in_addr *)(&(neighbor_entry.ip_address.addr.ip4)))));
         status = sai_neighbor_api->create_neighbor_entry(&neighbor_entry,
                                    (uint32_t)neighbor_attrs.size(), neighbor_attrs.data());
         if (status != SAI_STATUS_SUCCESS)
